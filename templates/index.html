@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        #question {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .btn-group {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .answer-btn {
+            flex: 1;
+            margin: 0 10px;
+            padding: 15px;
+            border: 2px solid #3498db;
+            background-color: white;
+            color: #3498db;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            font-weight: bold;
+        }
+        .answer-btn.selected {
+            background-color: #3498db;
+            color: white;
+        }
+        .answer-btn.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 45%;
+            left: 25%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+        #next-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #next-btn:hover {
+            background-color: #27ae60;
+        }
+        #timer {
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="timer">Time on question: 0s</div>
+        <div id="question"></div>
+        
+        <div class="btn-group">
+            <button id="yes-btn" class="answer-btn">Yes</button>
+            <button id="no-btn" class="answer-btn">No</button>
+        </div>
+
+        <button id="next-btn">Next Question</button>
+    </div>
+
+    <script>
+        let mouseData = [];
+        let currentQuestion = null;
+        let questionStartTime = null;
+
+        function trackMouseMovement(event) {
+            const currentTime = Date.now();
+            const entry = {
+                timestamp: currentTime,
+                x: event.clientX,
+                y: event.clientY,
+                dx: event.movementX,
+                dy: event.movementY,
+                acceleration: Math.sqrt(event.movementX**2 + event.movementY**2),
+                click: 0
+            };
+            mouseData.push(entry);
+        }
+
+        function updateTimer() {
+            if (questionStartTime) {
+                const elapsedTime = Math.floor((Date.now() - questionStartTime) / 1000);
+                document.getElementById('timer').textContent = `Time on question: ${elapsedTime}s`;
+            }
+        }
+
+        setInterval(updateTimer, 1000);
+
+        function logClick(buttonId) {
+            const currentTime = Date.now();
+            const entry = {
+                timestamp: currentTime,
+                x: event.clientX,
+                y: event.clientY,
+                dx: 0,
+                dy: 0,
+                acceleration: 0,
+                click: 1
+            };
+            mouseData.push(entry);
+        }
+
+        function saveData() {
+            const questionTime = questionStartTime ? Date.now() - questionStartTime : 0;
+            
+            fetch('/log_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data: mouseData
+                })
+            });
+            
+            mouseData = [];
+        }
+
+        function fetchQuestion() {
+            fetch('/get_question')
+                .then(response => response.json())
+                .then(data => {
+                    currentQuestion = data.question;
+                    document.getElementById('question').textContent = data.question;
+                    
+                    // Reset buttons
+                    document.getElementById('yes-btn').classList.remove('selected');
+                    document.getElementById('no-btn').classList.remove('selected');
+                    
+                    questionStartTime = Date.now();
+                });
+        }
+
+        document.addEventListener('mousemove', trackMouseMovement);
+
+        document.getElementById('yes-btn').addEventListener('click', function(e) {
+            const noBtn = document.getElementById('no-btn');
+            this.classList.add('selected');
+            noBtn.classList.remove('selected');
+            logClick('yes-btn');
+        });
+
+        document.getElementById('no-btn').addEventListener('click', function(e) {
+            const yesBtn = document.getElementById('yes-btn');
+            this.classList.add('selected');
+            yesBtn.classList.remove('selected');
+            logClick('no-btn');
+        });
+
+        document.getElementById('next-btn').addEventListener('click', function(e) {
+            logClick('next-btn');
+            saveData();
+            fetchQuestion();
+        });
+
+        fetchQuestion();
+    </script>
+</body>
+</html>
