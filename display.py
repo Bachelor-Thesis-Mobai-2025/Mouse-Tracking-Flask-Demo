@@ -1,58 +1,71 @@
 import os
-import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
+import pandas as pd
 
-def plot_enhanced_trajectory(mouse_csv):
-    # Read mouse tracking data
-    mouse_df = pd.read_csv(mouse_csv)
-    
-    # Flip y-coordinates
-    mouse_df['flipped_y'] = mouse_df['y'].max() - mouse_df['y']
-    
-    # Create color gradient based on acceleration
-    acceleration_normalized = (mouse_df['acceleration'] - mouse_df['acceleration'].min()) / \
-                               (mouse_df['acceleration'].max() - mouse_df['acceleration'].min())
-    
-    plt.figure(figsize=(12, 8))
+matplotlib.use('TkAgg')
 
-    plt.plot(mouse_df['x'], mouse_df['flipped_y'])
-    
-    # Plot trajectory with color gradient
-    plt.scatter(mouse_df['x'], mouse_df['flipped_y'], 
-                c=acceleration_normalized, 
-                cmap='coolwarm', 
-                s=20)
-    
-    plt.colorbar(label='Normalized Acceleration')
-    plt.title('Mouse Movement Trajectory with Acceleration')
-    plt.xlabel('X Coordinate')
-    plt.ylabel('Y Coordinate')
-    
-    # Add click markers if click data provided
-    clicks = mouse_df.index[mouse_df['click'] == True].tolist()
 
-    for click in clicks:
-        plt.scatter(mouse_df['x'][click], mouse_df['flipped_y'][click], 
-                    color='green', 
-                    marker='x', 
-                    s=100, 
-                    label='Clicks')
-        plt.legend()
-    
-    plt.tight_layout()
-    plt.show()
+def slideshow_bot_trajectories_last_10(dir_name='data/bot'):
+    """
+    Displays each of the last 10 CSV plots in sequence (by file creation time),
+    letting you press Enter to move to the next.
+    """
+    # Find all matching CSV files
+    all_files = [
+        f for f in os.listdir(dir_name)
+        if f.startswith('tracking') and f.endswith('.csv')
+    ]
+    if not all_files:
+        raise FileNotFoundError(f"No mouse tracking CSV files found in '{dir_name}'")
 
-def get_latest_files(dir_name='data'):
-    mouse_files = [f for f in os.listdir(dir_name) if f.startswith('tracking') and f.endswith('.csv')]
-    
-    if not mouse_files:
-        raise FileNotFoundError("No mouse tracking CSV files found")
-    
-    latest_mouse = max([os.path.join(dir_name, f) for f in mouse_files], key=os.path.getctime)
-    
-    return latest_mouse
+    # Sort by creation time (oldest first)
+    all_files.sort(key=lambda f: os.path.getctime(os.path.join(dir_name, f)))
+
+    # Take only the last 10 (most recent)
+    mouse_files = all_files[:]
+
+    _, ax = plt.subplots(figsize=(12, 8))
+
+    for i, file in enumerate(mouse_files, start=1):
+        csv_path = os.path.join(dir_name, file)
+
+        # Read the CSV
+        df = pd.read_csv(csv_path)
+
+        # Convert 'click' to boolean if it's 0/1
+        if 'click' in df.columns and df['click'].dtype != bool:
+            df['click'] = df['click'] == 1
+
+        # Optional: Flip the y-coordinates
+        df['flipped_y'] = df['y'].max() - df['y']
+
+        # Clear the axes for the new plot
+        ax.clear()
+
+        # Plot the trajectory
+        ax.plot(df['x'], df['flipped_y'], color='blue', alpha=0.7)
+        ax.set_title(f"File: {file} ({i}/{len(mouse_files)})")
+        ax.set_xlabel("X Coordinate")
+        ax.set_ylabel("Y Coordinate (Flipped)")
+
+        # Mark clicks if present
+        clicks_df = df[df['click'] == True]
+        if not clicks_df.empty:
+            ax.scatter(
+                clicks_df['x'],
+                clicks_df['flipped_y'],
+                color='green',
+                marker='x',
+                s=100,
+                label='Clicks'
+            )
+            ax.legend()
+
+        plt.pause(1)
+        plt.plot()
+
 
 if __name__ == '__main__':
-    mouse_csv = get_latest_files()
-    plot_enhanced_trajectory(mouse_csv)
+    # slideshow_bot_trajectories_last_10('data/human')
+    slideshow_bot_trajectories_last_10('data/bot')

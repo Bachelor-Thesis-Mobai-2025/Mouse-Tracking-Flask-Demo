@@ -1,1 +1,2 @@
-.venvecho "# Mouse-Tracking-Flask-Demo" >> README.mdt
+.venv
+data/
