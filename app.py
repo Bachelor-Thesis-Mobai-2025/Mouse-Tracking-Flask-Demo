@@ -110,7 +110,7 @@ def log_data():
     # Save to CSV
     with open(filename, 'w', newline='') as csvfile:
         fieldnames = ['timestamp', 'x', 'y', 'dx', 'dy', 'velocity', 'velocity_variability',
-                      'curvature', 'path_efficiency', 'decision_path_efficiency',
+                      'curvature', 'decision_path_efficiency',
                       'final_decision_path_efficiency', 'changes_of_mind', 'click']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -175,7 +175,6 @@ def process_mouse_data(mouse_data):
 
     # Add the path efficiency metrics to each entry
     for entry in processed_data:
-        entry['path_efficiency'] = path_metrics['overall_path_efficiency']
         entry['decision_path_efficiency'] = path_metrics['decision_path_efficiency']
         entry['final_decision_path_efficiency'] = path_metrics['final_decision_path_efficiency']
         entry['changes_of_mind'] = path_metrics['changes_of_mind']
@@ -229,7 +228,6 @@ def decision_path_analysis(mouse_data):
     click_indices = [i for i, entry in enumerate(mouse_data) if entry['click'] == 1]
 
     results = {
-        'overall_path_efficiency': 1.0,
         'decision_path_efficiency': 1.0,
         'final_decision_path_efficiency': 1.0,
         'changes_of_mind': 0
@@ -237,11 +235,6 @@ def decision_path_analysis(mouse_data):
 
     if not click_indices:
         return results  # No clicks detected
-
-    # Calculate overall path efficiency (start to end)
-    points_x = [entry['x'] for entry in mouse_data]
-    points_y = [entry['y'] for entry in mouse_data]
-    results['overall_path_efficiency'] = calculate_path_efficiency(points_x, points_y)
 
     # Since we no longer log Next button clicks, each click is a decision click
     if len(click_indices) >= 1:

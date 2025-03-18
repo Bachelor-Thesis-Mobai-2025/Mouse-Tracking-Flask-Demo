@@ -90,6 +90,7 @@ setInterval(updateTimer, 1000);
 
 // Log a click
 function logClick() {
+
     const currentTime = Date.now();
 
     // Calculate dx and dy from last recorded position
@@ -228,17 +229,21 @@ function fetchQuestion() {
 
 // Human clicks
 yesBtn.addEventListener('click', () => {
-    yesBtn.classList.add('selected');
-    noBtn.classList.remove('selected');
-    selectedAnswer = 1; // Yes = 1
-    logClick();
+    if (!yesBtn.classList.contains('selected')) {
+        selectedAnswer = 1; // Yes = 1
+        logClick();
+        yesBtn.classList.add('selected');
+        noBtn.classList.remove('selected');
+    }
 });
 
 noBtn.addEventListener('click', () => {
-    noBtn.classList.add('selected');
-    yesBtn.classList.remove('selected');
-    selectedAnswer = 0; // No = 0
-    logClick();
+    if (!noBtn.classList.contains('selected')) {
+        selectedAnswer = 0; // No = 0
+        logClick();
+        noBtn.classList.add('selected');
+        yesBtn.classList.remove('selected');
+    }
 });
 
 // Existing shake animation function (if not already defined)

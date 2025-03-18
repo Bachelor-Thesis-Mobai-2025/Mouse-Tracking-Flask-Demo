@@ -451,7 +451,6 @@ def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Pat
             Dictionary of extracted metrics
         """
         metrics = {
-            'path_efficiency': [],
             'decision_path_efficiency': [],
             'final_decision_path_efficiency': [],
             'changes_of_mind': []
