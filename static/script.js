@@ -9,8 +9,8 @@ const noBtn = document.getElementById('no-btn');
 const nextBtn = document.getElementById('next-btn');
 const questionElement = document.getElementById('question');
 
-// Fixed-rate sampling at 60Hz (approximately 16.67ms)
-const samplingInterval = 1000 / 60; // 16.67ms for 60Hz
+// Fixed-rate sampling at 100Hz (10ms)
+const samplingInterval = 1000 / 100; // 10ms for 100Hz
 
 // Current mouse position
 let currentMouseX = 0;
@@ -271,7 +271,6 @@ document.head.appendChild(styleSheet);
 // In your existing event listener
 nextBtn.addEventListener('click', () => {
     if (yesBtn.style.display !== 'none' && noBtn.style.display !== 'none') {
-        logClick();
         saveData();
     }
     if (yesBtn.classList.contains('selected')

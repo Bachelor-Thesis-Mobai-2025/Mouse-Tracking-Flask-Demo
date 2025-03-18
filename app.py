@@ -20,8 +20,7 @@ os.makedirs('data/truthful', exist_ok=True)
 INSTRUCTIONS = {
     "start": "Thank you for taking time answering the following questions. We ask that you answer these next 10 "
              "questions truthfully.",
-    "switch": "For the next set of questions, please take on the persona of a professor at RMIT in Melbourne, "
-              "Australia and answer as if that was true.",
+    "switch": "For the next 10 questions we ask that you answer the questions deceitfully (Lie).",
     "end": "You have completed all questions. Thank you for your participation!"
 }
 
@@ -244,13 +243,12 @@ def decision_path_analysis(mouse_data):
     points_y = [entry['y'] for entry in mouse_data]
     results['overall_path_efficiency'] = calculate_path_efficiency(points_x, points_y)
 
-    # Identify the final decision click (last click before the final "Next" click)
-    # Assuming the pattern is [decision clicks...] -> [next button click]
-    if len(click_indices) >= 2:
-        final_decision_idx = click_indices[-2]  # Second-to-last click
+    # Since we no longer log Next button clicks, each click is a decision click
+    if len(click_indices) >= 1:
+        final_decision_idx = click_indices[-1]  # Last click is the final decision
 
-        # Count how many decision clicks came before (changes of mind)
-        results['changes_of_mind'] = len(click_indices) - 2
+        # Count changes of mind (number of clicks minus 1)
+        results['changes_of_mind'] = len(click_indices) - 1
 
         # Calculate path efficiency up to first decision
         if click_indices[0] > 0:
@@ -266,14 +264,6 @@ def decision_path_analysis(mouse_data):
         results['final_decision_path_efficiency'] = calculate_path_efficiency(
             final_decision_points_x, final_decision_points_y
         )
-    elif len(click_indices) == 1:
-        # Only one click - must be the decision
-        decision_points_x = [entry['x'] for entry in mouse_data[:click_indices[0]+1]]
-        decision_points_y = [entry['y'] for entry in mouse_data[:click_indices[0]+1]]
-        results['decision_path_efficiency'] = calculate_path_efficiency(
-            decision_points_x, decision_points_y
-        )
-        results['final_decision_path_efficiency'] = results['decision_path_efficiency']
 
     return results
 
