@@ -1,13 +1,13 @@
 import glob
 import os
-import random
 import traceback
 
 import matplotlib
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.stats import gaussian_kde
 
 # Use TkAgg backend for compatibility
 matplotlib.use('TkAgg')
@@ -104,7 +104,7 @@ def get_files_by_type(data_directory, truthful=True, max_files=None):
 
     files = glob.glob(os.path.join(folder_path, "*.csv"))
 
-    return random.sample(files, max_files) if max_files and len(files) > max_files else files
+    return files if max_files is None else files[:min(max_files, len(files))]
 
 
 def find_decision_point(df):
@@ -201,30 +201,37 @@ def create_average_trajectory(files, normalize=True, resolution=100):
         y_values[i] = np.interp(time_grid, traj['time_normalized'], traj['y_normalized'])
         velocities[i] = np.interp(time_grid, traj['time_normalized'], traj['velocity'])
 
-    # Create a DataFrame for the average trajectory
+    # Calculate min and max for each metric
+    min_velocities = np.min(velocities, axis=0)
+    max_velocities = np.max(velocities, axis=0)
+
+    # Create a DataFrame for the average trajectory with additional columns for min/max
     return pd.DataFrame({
         'time_normalized': time_grid,
         'x_normalized': np.mean(x_values, axis=0),
         'y_normalized': np.mean(y_values, axis=0),
-        'velocity': np.mean(velocities, axis=0)
+        'velocity': np.mean(velocities, axis=0),
+        'velocity_min': min_velocities,
+        'velocity_max': max_velocities
     })
 
 
-def create_trajectory_plots(data_directory):
+def create_trajectory_plots(data_directory, save_directory=None):
     """
-    Create comprehensive visualizations of mouse tracking data.
+    Create comprehensive visualizations of mouse tracking data and save individual plots.
 
     Parameters:
     -----------
     data_directory : str
         Path to the data directory
+    save_directory : str, optional
+        Directory to save individual plots. If None, plots are not saved.
 
     Returns:
     --------
-    matplotlib.figure.Figure
-        Generated visualization figure
+    None
     """
-    # Get sample files
+    # Get all files
     truthful_files = get_files_by_type(data_directory, truthful=True)
     deceptive_files = get_files_by_type(data_directory, truthful=False)
 
@@ -238,164 +245,245 @@ def create_trajectory_plots(data_directory):
     truthful_avg = create_average_trajectory(truthful_files)
     deceptive_avg = create_average_trajectory(deceptive_files)
 
-    # Get one sample file of each type for 3D visualization
-    truthful_sample = load_and_preprocess_file(random.choice(truthful_files))
-    deceptive_sample = load_and_preprocess_file(random.choice(deceptive_files))
+    # List of metrics that might be available for coloring
+    possible_metrics = ['velocity', 'velocity_variability', 'curvature']
 
-    # Create figure with subplots
-    result_figure = plt.figure(figsize=(20, 15))
+    # Filter to metrics that actually exist in the data
+    available_metrics = [m for m in possible_metrics if m in truthful_avg.columns]
 
-    # 1. 2D Average Truthful Path with velocity heatmap
-    ax1 = result_figure.add_subplot(231)
-    plot_2d_trajectory(ax1, truthful_avg, "Average Truthful Trajectory")
+    # Create directory for saving plots if it doesn't exist
+    if save_directory and not os.path.exists(save_directory):
+        os.makedirs(save_directory)
 
-    # 2. 2D Average Deceptive Path with velocity heatmap
-    ax2 = result_figure.add_subplot(232)
-    plot_2d_trajectory(ax2, deceptive_avg, "Average Deceptive Trajectory")
+    # Base plot functions (standard metrics)
+    plot_functions = [
+        # 2D Trajectories with velocity coloring
+        (plot_2d_trajectory, [truthful_avg, True, 'velocity'], "2D_Truthful_Trajectory_Velocity"),
+        (plot_2d_trajectory, [deceptive_avg, False, 'velocity'], "2D_Deceptive_Trajectory_Velocity"),
 
-    # 3. 3D Sample Truthful Path
-    ax3 = result_figure.add_subplot(233, projection='3d')
-    plot_3d_trajectory(ax3, truthful_sample, "Sample Truthful Trajectory (3D)")
+        # 3D Trajectories with standard configuration
+        (plot_3d_average_trajectory, [truthful_avg, True, 'velocity', None], "3D_Truthful_Trajectory"),
+        (plot_3d_average_trajectory, [deceptive_avg, False, 'velocity', None], "3D_Deceptive_Trajectory"),
 
-    # 4. 3D Sample Deceptive Path
-    ax4 = result_figure.add_subplot(234, projection='3d')
-    plot_3d_trajectory(ax4, deceptive_sample, "Sample Deceptive Trajectory (3D)")
+        # Velocity visualizations
+        (plot_normalized_velocity_comparison, [truthful_avg, deceptive_avg], "Normalized_Velocity_Comparison"),
+        (plot_velocity_ranges, [truthful_avg, deceptive_avg], "Velocity_Ranges"),
+        (plot_velocity_averages, [truthful_avg, deceptive_avg], "Velocity_Averages"),
+        (plot_velocity_distribution, [truthful_avg, deceptive_avg], "Velocity_Distribution"),
 
-    # 5. Velocity comparison
-    ax5 = result_figure.add_subplot(235)
-    plot_metric_comparison(ax5, truthful_avg, deceptive_avg, 'velocity', "Velocity Comparison")
+        # Path efficiency metrics
+        (plot_path_efficiency_metrics, [truthful_files, deceptive_files], "Path_Efficiency_Metrics")
+    ]
 
-    # 6. Path efficiency comparison
-    ax6 = result_figure.add_subplot(236)
-    plot_path_efficiency_metrics(ax6, truthful_files, deceptive_files, "Path Efficiency Metrics Comparison")
+    # Add additional plots for available alternative metrics
+    for metric in available_metrics:
+        if metric != 'velocity':  # Skip velocity as it's already included
+            # Add 2D plots with this metric for coloring
+            plot_functions.append(
+                (plot_2d_trajectory, [truthful_avg, True, metric], f"2D_Truthful_Trajectory_{metric}")
+            )
+            plot_functions.append(
+                (plot_2d_trajectory, [deceptive_avg, False, metric], f"2D_Deceptive_Trajectory_{metric}")
+            )
 
-    # Add overall title
-    result_figure.suptitle("Mouse Tracking Analysis: Truthful vs. Deceptive Responses", fontsize=16)
+            # Add 3D plots with this metric for coloring
+            plot_functions.append(
+                (plot_3d_average_trajectory, [truthful_avg, True, metric, None], f"3D_Truthful_Trajectory_{metric}")
+            )
+            plot_functions.append(
+                (plot_3d_average_trajectory, [deceptive_avg, False, metric, None], f"3D_Deceptive_Trajectory_{metric}")
+            )
 
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.92)
+            # Add 3D plots with alternative z-axis
+            plot_functions.append(
+                (plot_3d_average_trajectory, [truthful_avg, True, 'velocity', metric], f"3D_Truthful_Z_{metric}")
+            )
+            plot_functions.append(
+                (plot_3d_average_trajectory, [deceptive_avg, False, 'velocity', metric], f"3D_Deceptive_Z_{metric}")
+            )
 
-    return result_figure
+    # Create each plot
+    for plot_func, args, filename in plot_functions:
+        try:
+            fig = plt.figure(figsize=(10, 8))
+            # Use 3D projection only for 3D trajectory plots
+            if '3D' in filename:
+                ax = fig.add_subplot(111, projection='3d')
+            else:
+                ax = fig.add_subplot(111)
+
+            plot_func(ax, *args)
+            plt.tight_layout()
+
+            if save_directory:
+                plt.savefig(os.path.join(save_directory, f"{filename}.png"), dpi=300, bbox_inches='tight')
+                plt.close(fig)
+            else:
+                plt.show()
+        except Exception as plot_error:
+            print(f"Error creating {filename} plot: {plot_error}")
+            traceback.print_exc()
 
 
-def plot_3d_trajectory(ax, data_frame, title, color_by='velocity'):
+def plot_2d_trajectory(ax, data, is_truthful=True, color_metric='velocity'):
     """
-    Plot a 3D trajectory on the given axes.
+    Plot a single 2D trajectory with optimal path indicator and colored by a metric.
 
     Parameters:
     -----------
     ax : matplotlib.axes.Axes
         The axes to plot on
-    data_frame : pandas.DataFrame
-        The dataframe containing the trajectory data
-    title : str
-        Title for the plot
-    color_by : str
-        Which metric to use for coloring the trajectory
+    data : pandas.DataFrame
+        Trajectory data
+    is_truthful : bool
+        Whether the data is truthful (True) or deceptive (False)
+    color_metric : str
+        Metric to use for coloring the trajectory (e.g., 'velocity', 'curvature')
     """
-    # Determine decision point
-    decision_idx = find_decision_point(data_frame)
-    decision_idx = len(data_frame) - 1 if decision_idx < 0 else decision_idx
+    # Set variables based on data type
+    base_color = 'blue' if is_truthful else 'red'
+    label_prefix = 'Truthful' if is_truthful else 'Deceptive'
+    title_prefix = 'Truthful' if is_truthful else 'Deceptive'
 
-    # Color by the specified metric
-    color_values = data_frame[color_by] if color_by in data_frame.columns else np.arange(len(data_frame))
-    norm = plt.Normalize(color_values.min(), color_values.max())
-    colors = cm.viridis(norm(color_values))
+    # Check if selected metric exists
+    if color_metric in data.columns:
+        # Create a colored line segment plot
+        points = np.array([data['x_normalized'], data['y_normalized']]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-    # Plot the 3D trajectory
-    for i in range(decision_idx):
+        # Create a LineCollection with the specified colormap
+        from matplotlib.collections import LineCollection
+        norm = plt.Normalize(data[color_metric].min(), data[color_metric].max())
+        lc = LineCollection(segments, cmap='viridis', norm=norm, linewidth=3, alpha=0.8)
+        lc.set_array(data[color_metric][:-1])  # Set the colors
+        line = ax.add_collection(lc)
+        plt.colorbar(line, ax=ax, label=color_metric.replace('_', ' ').title())
+    else:
+        # Fallback to solid color line if metric not available
+        ax.plot(data['x_normalized'], data['y_normalized'],
+                color=base_color, alpha=0.7, linewidth=2, label=f'{label_prefix} Path')
+
+    # Plot the optimal path
+    ax.plot([data['x_normalized'].iloc[0], data['x_normalized'].iloc[-1]],
+            [data['y_normalized'].iloc[0], data['y_normalized'].iloc[-1]],
+            'g--', linewidth=2, alpha=0.7, label='Optimal Path')
+
+    # Add start and end points
+    ax.scatter(data['x_normalized'].iloc[0], data['y_normalized'].iloc[0],
+               color='green', s=100, label='Start')
+    ax.scatter(data['x_normalized'].iloc[-1], data['y_normalized'].iloc[-1],
+               color=base_color, s=100, label='End')
+
+    # Set labels and title
+    ax.set_xlabel('Normalized X Position')
+    ax.set_ylabel('Normalized Y Position')
+    ax.set_title(f'Average {title_prefix} 2D Trajectory (Colored by {color_metric.replace("_", " ").title()})')
+
+    # Add legend
+    ax.legend(loc='best')
+
+    return ax
+
+
+def plot_3d_average_trajectory(ax, data, is_truthful=True, color_metric='velocity', z_metric=None):
+    """
+    Plot a single 3D trajectory with optimal path indicator and custom metrics.
+
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on (must be 3D)
+    data : pandas.DataFrame
+        Trajectory data
+    is_truthful : bool
+        Whether the data is truthful (True) or deceptive (False)
+    color_metric : str
+        Metric to use for coloring the trajectory
+    z_metric : str, optional
+        If provided, use this metric for the z-axis instead of y_normalized
+    """
+    # Set color based on data type
+    base_color = 'blue' if is_truthful else 'red'
+    title_prefix = 'Truthful' if is_truthful else 'Deceptive'
+
+    # Determine z-axis values
+    if z_metric and z_metric in data.columns:
+        z_values = data[z_metric]
+        z_label = z_metric.replace('_', ' ').title()
+    else:
+        z_values = data['y_normalized']
+        z_label = 'Normalized Y Position'
+        z_metric = 'y_normalized'  # For title consistency
+
+    # Create a colormap based on the selected metric
+    if color_metric in data.columns:
+        norm = plt.Normalize(data[color_metric].min(), data[color_metric].max())
+        colors = plt.cm.viridis(norm(data[color_metric]))
+
+        # Plot the 3D trajectory with metric-based coloring
+        for i in range(len(data) - 1):
+            ax.plot(
+                data['time_normalized'].iloc[i:i+2],
+                data['x_normalized'].iloc[i:i+2],
+                z_values.iloc[i:i+2],
+                color=colors[i],
+                linewidth=2
+            )
+
+        # Create a scalar mappable for the colorbar
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis, norm=norm)
+        sm.set_array([])
+        plt.colorbar(sm, ax=ax, label=color_metric.replace('_', ' ').title())
+    else:
+        # Fallback to solid color if metric not available
         ax.plot(
-            data_frame['time_normalized'].iloc[i:i + 2],
-            data_frame['x_normalized'].iloc[i:i + 2],
-            data_frame['y_normalized'].iloc[i:i + 2],
-            color=colors[i],
-            linewidth=2
+            data['time_normalized'],
+            data['x_normalized'],
+            z_values,
+            color=base_color,
+            linewidth=2,
+            label=title_prefix
         )
 
-    # Add start and decision points
-    ax.scatter(data_frame['time_normalized'].iloc[0],
-               data_frame['x_normalized'].iloc[0],
-               data_frame['y_normalized'].iloc[0],
+    # Add start and end points
+    ax.scatter(data['time_normalized'].iloc[0],
+               data['x_normalized'].iloc[0],
+               z_values.iloc[0],
                color='green', s=100, label='Start')
-    ax.scatter(data_frame['time_normalized'].iloc[decision_idx],
-               data_frame['x_normalized'].iloc[decision_idx],
-               data_frame['y_normalized'].iloc[decision_idx],
-               color='purple', s=100, label='Decision Point')
+
+    ax.scatter(data['time_normalized'].iloc[-1],
+               data['x_normalized'].iloc[-1],
+               z_values.iloc[-1],
+               color=base_color, s=100, label='End')
 
     # Add optimal path line
     ax.plot(
-        [data_frame['time_normalized'].iloc[0], data_frame['time_normalized'].iloc[decision_idx]],
-        [data_frame['x_normalized'].iloc[0], data_frame['x_normalized'].iloc[decision_idx]],
-        [data_frame['y_normalized'].iloc[0], data_frame['y_normalized'].iloc[decision_idx]],
+        [data['time_normalized'].iloc[0], data['time_normalized'].iloc[-1]],
+        [data['x_normalized'].iloc[0], data['x_normalized'].iloc[-1]],
+        [z_values.iloc[0], z_values.iloc[-1]],
         'g--', linewidth=2, alpha=0.7, label='Optimal Path'
     )
 
     # Set labels and title
     ax.set_xlabel('Normalized Time')
     ax.set_ylabel('Normalized X Position')
-    ax.set_zlabel('Normalized Y Position')
-    ax.set_title(title)
+    ax.set_zlabel(z_label)
+
+    # Adjust title based on metrics used
+    if z_metric == 'y_normalized':
+        ax.set_title(f'Average {title_prefix} 3D Trajectory (Colored by {color_metric.replace("_", " ").title()})')
+    else:
+        ax.set_title(f'Average {title_prefix} 3D Trajectory\n(Z: {z_label},'
+                     f' Color: {color_metric.replace("_", " ").title()})')
+
     ax.legend()
 
     return ax
 
 
-def plot_2d_trajectory(ax, data_frame, title, color_by='velocity'):
+def plot_velocity_ranges(ax, truthful_data, deceptive_data):
     """
-    Plot a 2D trajectory on the given axes.
-
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        The axes to plot on
-    data_frame : pandas.DataFrame
-        The dataframe containing the trajectory data
-    title : str
-        Title for the plot
-    color_by : str
-        Which metric to use for coloring the trajectory
-    """
-    # Color by the specified metric
-    scatter = ax.scatter(
-        data_frame['x_normalized'],
-        data_frame['y_normalized'],
-        c=data_frame[color_by] if color_by in data_frame.columns else np.arange(len(data_frame)),
-        cmap='viridis',
-        s=15,
-        alpha=0.7
-    )
-
-    # Plot the actual path line
-    ax.plot(data_frame['x_normalized'], data_frame['y_normalized'], 'k-', alpha=0.3, linewidth=1, label='Actual Path')
-
-    # Plot the optimal path
-    ax.plot([data_frame['x_normalized'].iloc[0], data_frame['x_normalized'].iloc[-1]],
-            [data_frame['y_normalized'].iloc[0], data_frame['y_normalized'].iloc[-1]],
-            'g--', linewidth=2, alpha=0.7, label='Optimal Path')
-
-    # Add start and decision points
-    ax.scatter(data_frame['x_normalized'].iloc[0], data_frame['y_normalized'].iloc[0],
-               color='green', s=100, label='Start')
-    ax.scatter(data_frame['x_normalized'].iloc[-1], data_frame['y_normalized'].iloc[-1],
-               color='purple', s=100, label='Decision Point')
-
-    # Set labels and title
-    ax.set_xlabel('Normalized X Position')
-    ax.set_ylabel('Normalized Y Position')
-    ax.set_title(title)
-
-    # Add legend
-    ax.legend()
-
-    # Add colorbar
-    plt.colorbar(scatter, ax=ax, label=color_by.replace('_', ' ').title())
-
-    return ax
-
-
-def plot_metric_comparison(ax, truthful_data, deceptive_data, metric, title):
-    """
-    Plot a comparison of a specific metric between truthful and deceptive trajectories.
+    Plot velocity min/max ranges without average lines.
 
     Parameters:
     -----------
@@ -405,25 +493,177 @@ def plot_metric_comparison(ax, truthful_data, deceptive_data, metric, title):
         Truthful trajectory data
     deceptive_data : pandas.DataFrame
         Deceptive trajectory data
-    metric : str
-        Metric to compare
-    title : str
-        Plot title
     """
-    ax.plot(truthful_data['time_normalized'], truthful_data[metric], 'b-', label='Truthful', linewidth=2)
-    ax.plot(deceptive_data['time_normalized'], deceptive_data[metric], 'r-', label='Deceptive', linewidth=2)
+    time = truthful_data['time_normalized']
+
+    # Plot min/max ranges only (without average lines)
+    ax.fill_between(time,
+                    truthful_data['velocity_min'],
+                    truthful_data['velocity_max'],
+                    color='blue', alpha=0.3, label='Truthful Range')
+
+    ax.fill_between(time,
+                    deceptive_data['velocity_min'],
+                    deceptive_data['velocity_max'],
+                    color='red', alpha=0.3, label='Deceptive Range')
 
     ax.set_xlabel('Normalized Time')
-    ax.set_ylabel(metric.replace('_', ' ').title())
-    ax.set_title(title)
+    ax.set_ylabel('Velocity')
+    ax.set_title('Velocity Ranges: Truthful vs Deceptive')
     ax.legend()
 
     return ax
 
 
-def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Path Efficiency Comparison"):
+def plot_velocity_averages(ax, truthful_data, deceptive_data):
     """
-    Create a bar chart comparing path efficiency metrics between truthful and deceptive data.
+    Plot only the average velocities without ranges.
+
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on
+    truthful_data : pandas.DataFrame
+        Truthful trajectory data
+    deceptive_data : pandas.DataFrame
+        Deceptive trajectory data
+    """
+    time = truthful_data['time_normalized']
+
+    # Plot only average velocities
+    ax.plot(time, truthful_data['velocity'], 'b-', label='Truthful Avg', linewidth=2)
+    ax.plot(time, deceptive_data['velocity'], 'r-', label='Deceptive Avg', linewidth=2)
+
+    # Calculate difference between velocities
+    velocity_diff = np.abs(truthful_data['velocity'] - deceptive_data['velocity'])
+
+    # Find and highlight significant difference points
+    threshold = velocity_diff.mean() + velocity_diff.std()
+    significant_points = time[velocity_diff > threshold]
+
+    # Highlight regions of significant difference
+    for point in significant_points:
+        ax.axvline(x=point, color='grey', linestyle='--', alpha=0.2)
+
+    # Add annotation for significant differences
+    if len(significant_points) > 0:
+        ax.text(0.05, 0.95, f'Significant differences: {len(significant_points)} points',
+                transform=ax.transAxes, fontsize=10,
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='grey'))
+
+    ax.set_xlabel('Normalized Time')
+    ax.set_ylabel('Velocity')
+    ax.set_title('Average Velocities: Truthful vs Deceptive')
+    ax.legend()
+
+    return ax
+
+
+def plot_normalized_velocity_comparison(ax, truthful_data, deceptive_data):
+    """
+    Plot normalized velocity comparison for clearer visualization.
+
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on
+    truthful_data : pandas.DataFrame
+        Truthful trajectory data
+    deceptive_data : pandas.DataFrame
+        Deceptive trajectory data
+    """
+    time = truthful_data['time_normalized']
+
+    # Normalize velocities to 0-1 range for each dataset
+    def normalize_series(series):
+        min_val = series.min()
+        max_val = series.max()
+        return (series - min_val) / (max_val - min_val) if max_val > min_val else series
+
+    truthful_velocity_norm = normalize_series(truthful_data['velocity'])
+    deceptive_velocity_norm = normalize_series(deceptive_data['velocity'])
+
+    # Plot normalized velocities
+    ax.plot(time, truthful_velocity_norm, 'b-', label='Truthful', linewidth=2)
+    ax.plot(time, deceptive_velocity_norm, 'r-', label='Deceptive', linewidth=2)
+
+    # Add vertical lines at significant difference points
+    diff = np.abs(truthful_velocity_norm - deceptive_velocity_norm)
+    significant_points = time[diff > diff.mean() + diff.std()]
+
+    for point in significant_points:
+        ax.axvline(x=point, color='grey', linestyle='--', alpha=0.3)
+
+    # Add annotation for significant differences
+    if len(significant_points) > 0:
+        ax.text(0.05, 0.95, f'Significant differences: {len(significant_points)} points',
+                transform=ax.transAxes, fontsize=10,
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='grey'))
+
+    ax.set_xlabel('Normalized Time')
+    ax.set_ylabel('Normalized Velocity')
+    ax.set_title('Normalized Velocity Comparison: Truthful vs Deceptive')
+    ax.legend()
+
+    return ax
+
+
+def plot_velocity_distribution(ax, truthful_data, deceptive_data):
+    """
+    Plot velocity distribution comparison.
+
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on
+    truthful_data : pandas.DataFrame
+        Truthful trajectory data
+    deceptive_data : pandas.DataFrame
+        Deceptive trajectory data
+    """
+    # Get velocity data
+    truthful_vel = truthful_data['velocity']
+    deceptive_vel = deceptive_data['velocity']
+
+    # Create density plots
+    truthful_density = gaussian_kde(truthful_vel)
+    deceptive_density = gaussian_kde(deceptive_vel)
+
+    # Create x range for plotting
+    x_range = np.linspace(min(truthful_vel.min(), deceptive_vel.min()),
+                          max(truthful_vel.max(), deceptive_vel.max()),
+                          1000)
+
+    # Plot densities
+    ax.plot(x_range, truthful_density(x_range), 'b-', linewidth=2, label='Truthful')
+    ax.plot(x_range, deceptive_density(x_range), 'r-', linewidth=2, label='Deceptive')
+
+    # Add mean lines
+    ax.axvline(truthful_vel.mean(), color='blue', linestyle='--',
+               label=f'Truthful Mean: {truthful_vel.mean():.2f}')
+    ax.axvline(deceptive_vel.mean(), color='red', linestyle='--',
+               label=f'Deceptive Mean: {deceptive_vel.mean():.2f}')
+
+    # T-test for statistical comparison
+    _, p_value = stats.ttest_ind(truthful_vel, deceptive_vel)
+    significance = "Significant" if p_value < 0.05 else "Not Significant"
+
+    # Add t-test result annotation
+    ax.text(0.5, 0.95, f"T-test: p={p_value:.4f} ({significance})",
+            transform=ax.transAxes, ha='center', va='top',
+            bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
+
+    ax.set_xlabel('Velocity')
+    ax.set_ylabel('Density')
+    ax.set_title('Velocity Distribution: Truthful vs Deceptive')
+    ax.legend()
+
+    return ax
+
+
+def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files):
+    """
+    Create a bar chart comparing path efficiency metrics with overlapping min, max, and average bars.
 
     Parameters:
     -----------
@@ -433,8 +673,6 @@ def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Pat
         List of truthful trajectory files
     deceptive_files : list
         List of deceptive trajectory files
-    title : str, optional
-        Plot title
     """
     def _extract_metrics(files):
         """
@@ -451,12 +689,13 @@ def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Pat
             Dictionary of extracted metrics
         """
         metrics = {
+            'path_efficiency': [],
             'decision_path_efficiency': [],
             'final_decision_path_efficiency': [],
             'changes_of_mind': []
         }
 
-        for file in files[:10]:  # Limit to first 10 files for speed
+        for file in files:
             try:
                 df = pd.read_csv(file)
                 for metric_name in metrics:
@@ -471,10 +710,10 @@ def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Pat
     truthful_metrics = _extract_metrics(truthful_files)
     deceptive_metrics = _extract_metrics(deceptive_files)
 
-    # Calculate averages for metrics with data
-    def _calculate_averages(metrics_dict):
+    # Calculate statistics for metrics with data
+    def _calculate_stats(metrics_dict):
         """
-        Calculate averages for metrics.
+        Calculate min, max, and average for metrics.
 
         Parameters:
         -----------
@@ -484,66 +723,119 @@ def plot_path_efficiency_metrics(ax, truthful_files, deceptive_files, title="Pat
         Returns:
         --------
         dict
-            Dictionary of average metrics
+            Dictionary of metric statistics
         """
-        return {metric: np.mean(values) for metric, values in metrics_dict.items() if values}
+        stats_dict = {}
+        for metric, values in metrics_dict.items():
+            if values:
+                stats_dict[metric] = {
+                    'min': np.min(values),
+                    'max': np.max(values),
+                    'avg': np.mean(values)
+                }
+        return stats_dict
 
-    truthful_averages = _calculate_averages(truthful_metrics)
-    deceptive_averages = _calculate_averages(deceptive_metrics)
+    truthful_stats = _calculate_stats(truthful_metrics)
+    deceptive_stats = _calculate_stats(deceptive_metrics)
 
-    # Determine metrics to plot
+    # Determine metrics to plot (exclude changes_of_mind as it will be handled separately)
     metrics_to_plot = [
         metric for metric in ['path_efficiency', 'decision_path_efficiency', 'final_decision_path_efficiency']
-        if metric in truthful_averages and metric in deceptive_averages
+        if metric in truthful_stats and metric in deceptive_stats
     ]
 
     # If no metrics to plot, show message
     if not metrics_to_plot:
         ax.text(0.5, 0.5, "No path efficiency metrics available",
                 ha='center', va='center', transform=ax.transAxes)
-        ax.set_title(title)
+        ax.set_title("Path Efficiency Metrics Comparison")
         return ax
 
-    # Plot bars
+    # Set up bar positions
     bar_width = 0.35
     x_indices = np.arange(len(metrics_to_plot))
 
-    truthful_bars = ax.bar(
-        x_indices - bar_width/2,
-        [truthful_averages[metric] for metric in metrics_to_plot],
-        bar_width, label='Truthful', color='blue'
-    )
+    # Define colors for different statistics
+    colors = {
+        'truthful': {
+            'min': 'lightskyblue',
+            'avg': 'royalblue',
+            'max': 'darkblue'
+        },
+        'deceptive': {
+            'min': 'lightcoral',
+            'avg': 'firebrick',
+            'max': 'darkred'
+        }
+    }
 
-    deceptive_bars = ax.bar(
-        x_indices + bar_width/2,
-        [deceptive_averages[metric] for metric in metrics_to_plot],
-        bar_width, label='Deceptive', color='red'
-    )
+    # Create overlapping bars for truthful data
+    for i, metric in enumerate(metrics_to_plot):
+        # Truthful data - left side
+        path_eff_stats = truthful_stats[metric]
 
-    # Add value labels on bars
-    for bars, averages in [(truthful_bars, truthful_averages), (deceptive_bars, deceptive_averages)]:
-        for i, bar in enumerate(bars):
-            metric = metrics_to_plot[i]
-            height = averages[metric]
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:.3f}', ha='center', va='bottom', fontsize=9)
+        # Plot min, avg, max bars with descending width
+        ax.bar(x_indices[i] - bar_width / 2, path_eff_stats['min'], width=bar_width,
+               color=colors['truthful']['min'], alpha=0.7, label='Truthful Min' if i == 0 else "")
+
+        ax.bar(x_indices[i] - bar_width / 2, path_eff_stats['avg'], width=bar_width * 0.8,
+               color=colors['truthful']['avg'], alpha=0.8, label='Truthful Avg' if i == 0 else "")
+
+        ax.bar(x_indices[i] - bar_width / 2, path_eff_stats['max'], width=bar_width * 0.6,
+               color=colors['truthful']['max'], alpha=0.9, label='Truthful Max' if i == 0 else "")
+
+        # Add text labels
+        ax.text(x_indices[i] - bar_width / 2, path_eff_stats['min'] - 0.03,
+                f"{path_eff_stats['min']:.2f}", ha='center', va='top', fontsize=8, rotation=90)
+
+        ax.text(x_indices[i] - bar_width / 2, path_eff_stats['avg'] + 0.01,
+                f"{path_eff_stats['avg']:.2f}", ha='center', va='bottom', fontsize=8, color='white', weight='bold')
+
+        ax.text(x_indices[i] - bar_width / 2, path_eff_stats['max'] + 0.03,
+                f"{path_eff_stats['max']:.2f}", ha='center', va='bottom', fontsize=8)
+
+        # Deceptive data - right side
+        path_eff_stats = deceptive_stats[metric]
+
+        # Plot min, avg, max bars with descending width
+        ax.bar(x_indices[i] + bar_width / 2, path_eff_stats['min'], width=bar_width,
+               color=colors['deceptive']['min'], alpha=0.7, label='Deceptive Min' if i == 0 else "")
+
+        ax.bar(x_indices[i] + bar_width / 2, path_eff_stats['avg'], width=bar_width * 0.8,
+               color=colors['deceptive']['avg'], alpha=0.8, label='Deceptive Avg' if i == 0 else "")
+
+        ax.bar(x_indices[i] + bar_width / 2, path_eff_stats['max'], width=bar_width * 0.6,
+               color=colors['deceptive']['max'], alpha=0.9, label='Deceptive Max' if i == 0 else "")
+
+        # Add text labels
+        ax.text(x_indices[i] + bar_width / 2, path_eff_stats['min'] - 0.03,
+                f"{path_eff_stats['min']:.2f}", ha='center', va='top', fontsize=8, rotation=90)
+
+        ax.text(x_indices[i] + bar_width / 2, path_eff_stats['avg'] + 0.01,
+                f"{path_eff_stats['avg']:.2f}", ha='center', va='bottom', fontsize=8, color='white', weight='bold')
+
+        ax.text(x_indices[i] + bar_width / 2, path_eff_stats['max'] + 0.03,
+                f"{path_eff_stats['max']:.2f}", ha='center', va='bottom', fontsize=8)
 
     # Add changes of mind annotation
-    if 'changes_of_mind' in truthful_averages and 'changes_of_mind' in deceptive_averages:
-        t_changes = truthful_averages['changes_of_mind']
-        d_changes = deceptive_averages['changes_of_mind']
+    if 'changes_of_mind' in truthful_stats and 'changes_of_mind' in deceptive_stats:
+        t_changes_avg = truthful_stats['changes_of_mind']['avg']
+        t_changes_max = truthful_stats['changes_of_mind']['max']
+        d_changes_avg = deceptive_stats['changes_of_mind']['avg']
+        d_changes_max = deceptive_stats['changes_of_mind']['max']
         ax.text(0.5, 0.01,
-                f"Avg. Changes of Mind: Truthful={t_changes:.2f}, Deceptive={d_changes:.2f}",
+                f"Avg. Changes of Mind: Truthful={t_changes_avg:.2f}, Deceptive={d_changes_avg:.2f}\n"
+                f"Max. Changes of Mind: Truthful={t_changes_max:.2f}, Deceptive={d_changes_max:.2f}",
                 ha='center', va='bottom', transform=ax.transAxes, fontsize=10,
                 bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
 
     # Customize plot
     ax.set_ylabel('Efficiency Ratio')
-    ax.set_title(title)
+    ax.set_title("Path Efficiency Metrics Comparison")
     ax.set_xticks(x_indices)
     ax.set_xticklabels([metric.replace('_', ' ').title() for metric in metrics_to_plot],
                        rotation=45, ha='right')
-    ax.legend()
+    ax.legend(loc='upper left', ncol=2)
 
     return ax
 
@@ -556,12 +848,13 @@ def main():
         # Default data directory
         data_directory = "data"
 
-        # Create visualization
-        visualization = create_trajectory_plots(data_directory)
+        # Create output directory for individual plots
+        graphs_directory = "graphs"
 
-        # Display the plot
-        if visualization:
-            plt.show()
+        # Create visualizations and save as individual files
+        create_trajectory_plots(data_directory, graphs_directory)
+
+        print(f"Visualizations saved to {graphs_directory}")
     except Exception as main_error:
         print(f"Error creating visualization: {main_error}")
         traceback.print_exc()

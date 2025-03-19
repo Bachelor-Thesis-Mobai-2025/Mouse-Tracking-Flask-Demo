@@ -2,6 +2,7 @@ import os
 import csv
 import math
 import numpy as np
+import random
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
@@ -68,27 +69,28 @@ GROUND_TRUTH = [
 
 @app.route('/')
 def index():
-    # Reset question counter when starting a new session
-    session['question_index'] = -1
+    # Reset session data when starting a new session
+    session['question_count'] = 0
+    session['asked_truthful_indices'] = []
+    session['asked_deceptive_indices'] = []
+    session['phase'] = 'truthful'
     return render_template('index.html')
 
 
 @app.route('/log_data', methods=['POST'])
 def log_data():
     data = request.json
-    question_index = session.get('question_index', 0) - 1  # -1 because we increment before getting next question
+
+    # Get the last asked question index from session
+    last_question_index = session.get('last_question_index', 0)
 
     # Get user's answer (1 for yes, 0 for no)
     user_answer = data.get('answer', None)
     if user_answer is None:
         return jsonify({"status": "error", "message": "No answer provided"})
 
-    # Reduce the question index to prevent Out-of-Bounds
-    if session.get('question_index', 0) > 10:
-        question_index -= 1
-
     # Get ground truth for this question
-    ground_truth = GROUND_TRUTH[question_index]
+    ground_truth = GROUND_TRUTH[last_question_index]
 
     # Determine if the answer was truthful
     is_truthful = user_answer == ground_truth
@@ -261,35 +263,61 @@ def decision_path_analysis(mouse_data):
     return results
 
 
+def get_random_question_index(phase):
+    """Get a random question index that hasn't been asked yet for the current phase."""
+    # Define the range of indices based on the phase
+    if phase == 'truthful':
+        # For truthful phase, use questions 0-9 (first 10 questions)
+        available_indices = list(range(10))
+        already_asked = session.get('asked_truthful_indices', [])
+    else:  # 'deceptive' phase
+        # For deceptive phase, use questions 11-20 (skip the empty question at index 10)
+        available_indices = list(range(11, 21))
+        already_asked = session.get('asked_deceptive_indices', [])
+
+    # Filter out questions that have already been asked
+    remaining_indices = [idx for idx in available_indices if idx not in already_asked]
+
+    # If we've asked all questions in this phase, return None
+    if not remaining_indices:
+        return None
+
+    # Select a random question from the remaining ones
+    return random.choice(remaining_indices)
+
+
 @app.route('/get_question')
 def get_question():
-    # Get current question index
-    question_index = session.get('question_index', -1)
+    # Get current question count
+    question_count = session.get('question_count', 0)
+    phase = session.get('phase', 'truthful')
 
     # Check if we need to show instructions
-    if question_index == -1:
-        # Starting instructions
+    if question_count == 0:
+        # Starting instructions - first time
+        session['question_count'] = 1
+        session['phase'] = 'truthful'
+        session['asked_truthful_indices'] = []
+        session['asked_deceptive_indices'] = []
 
-        # Increment for next time
-        session['question_index'] = question_index + 1
         return jsonify({
             "isInstruction": True,
             "instruction": INSTRUCTIONS["start"],
             "questionNumber": 0,
-            "totalQuestions": len(QUESTIONS)
+            "totalQuestions": 20  # Total of 20 questions (10 truthful + 10 deceptive)
         })
-    elif question_index == 10:
+    elif question_count == 10:
         # Switch to deceptive mode instructions
+        session['phase'] = 'deceptive'
+        session['question_count'] = 11
 
-        # Increment for next time
-        session['question_index'] = question_index + 1
         return jsonify({
             "isInstruction": True,
             "instruction": INSTRUCTIONS["switch"],
             "questionNumber": 10,
-            "totalQuestions": len(QUESTIONS)
+            "totalQuestions": 20
         })
-    elif question_index >= len(QUESTIONS):
+    elif question_count >= 20:
         # End of experiment
         return jsonify({
             "isInstruction": True,
@@ -297,17 +325,31 @@ def get_question():
             "complete": True
         })
 
-    # Return the current question
-    current_question = QUESTIONS[question_index]
+    # Get a random question index for the current phase
+    question_index = get_random_question_index(phase)
 
-    # Increment for next time
-    session['question_index'] = question_index + 1
+    # Store the last question index for logging purposes
+    session['last_question_index'] = question_index
 
+    # Add this question to the list of asked questions
+    if phase == 'truthful':
+        asked_indices = session.get('asked_truthful_indices', [])
+        asked_indices.append(question_index)
+        session['asked_truthful_indices'] = asked_indices
+    else:  # 'deceptive' phase
+        asked_indices = session.get('asked_deceptive_indices', [])
+        asked_indices.append(question_index)
+        session['asked_deceptive_indices'] = asked_indices
+
+    # Increment question count
+    session['question_count'] = question_count + 1
+
+    # Return the selected question
     return jsonify({
         "isInstruction": False,
-        "question": current_question,
-        "questionNumber": question_index + 1,
-        "totalQuestions": len(QUESTIONS)
+        "question": QUESTIONS[question_index],
+        "questionNumber": question_count + 1,
+        "totalQuestions": 20
     })
 
 
