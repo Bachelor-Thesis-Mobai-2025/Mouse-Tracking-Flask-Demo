@@ -89,6 +89,9 @@ def log_data():
     if user_answer is None:
         return jsonify({"status": "error", "message": "No answer provided"})
 
+    if session.get('phase') == 'deceptive':
+        last_question_index -= 1
+
     # Get ground truth for this question
     ground_truth = GROUND_TRUTH[last_question_index]
 
@@ -185,19 +188,38 @@ def process_mouse_data(mouse_data):
 
 
 def calculate_curvature(x, y):
-    """Calculate curvature at each point of a trajectory."""
+    """Calculate curvature at each point of a trajectory with division by zero protection."""
+    if len(x) < 3 or len(y) < 3:
+        # Need at least 3 points to calculate curvature
+        return [0] * len(x)
+
     # First derivatives
     dx = np.gradient(x)
     dy = np.gradient(y)
+
+    # Create denominator
+    denominator = (dx ** 2 + dy ** 2) ** 1.5
 
     # Second derivatives
     ddx = np.gradient(dx)
     ddy = np.gradient(dy)
 
-    # Curvature formula: |x'y'' - y'x''| / (x'^2 + y'^2)^(3/2)
-    curvature = np.abs(dx * ddy - dy * ddx) / (dx ** 2 + dy ** 2) ** 1.5
+    # Numerator for curvature
+    numerator = np.abs(dx * ddy - dy * ddx)
 
-    # Replace any NaN or inf values with 0
+    # Initialize curvature array with zeros
+    curvature = np.zeros_like(x, dtype=float)
+
+    # Calculate curvature where denominator is not zero (or very close to zero)
+    # Use a small epsilon value to avoid division by tiny numbers
+    epsilon = 1e-10
+    mask = denominator > epsilon
+
+    if np.any(mask):
+        curvature[mask] = numerator[mask] / denominator[mask]
+
+    # No need to use nan_to_num as we've handled division by zero directly
+    # But we still want to ensure no NaN or Inf values remain (just in case)
     curvature = np.nan_to_num(curvature)
 
     return curvature.tolist()
@@ -271,7 +293,7 @@ def get_random_question_index(phase):
         available_indices = list(range(10))
         already_asked = session.get('asked_truthful_indices', [])
     else:  # 'deceptive' phase
-        # For deceptive phase, use questions 11-20 (skip the empty question at index 10)
+        # For deceptive phase, use questions 11-21 (skip the empty question at index 10)
         available_indices = list(range(11, 21))
         already_asked = session.get('asked_deceptive_indices', [])
 
@@ -302,22 +324,18 @@ def get_question():
 
         return jsonify({
             "isInstruction": True,
-            "instruction": INSTRUCTIONS["start"],
-            "questionNumber": 0,
-            "totalQuestions": 20  # Total of 20 questions (10 truthful + 10 deceptive)
+            "instruction": INSTRUCTIONS["start"]
         })
-    elif question_count == 10:
+    elif question_count == 11:
         # Switch to deceptive mode instructions
         session['phase'] = 'deceptive'
-        session['question_count'] = 11
+        session['question_count'] = 12
 
         return jsonify({
             "isInstruction": True,
-            "instruction": INSTRUCTIONS["switch"],
-            "questionNumber": 10,
-            "totalQuestions": 20
+            "instruction": INSTRUCTIONS["switch"]
         })
-    elif question_count >= 20:
+    elif question_count >= 22:
         # End of experiment
         return jsonify({
             "isInstruction": True,
@@ -347,9 +365,7 @@ def get_question():
     # Return the selected question
     return jsonify({
         "isInstruction": False,
-        "question": QUESTIONS[question_index],
-        "questionNumber": question_count + 1,
-        "totalQuestions": 20
+        "question": QUESTIONS[question_index]
     })
 
 
