@@ -17,38 +17,47 @@ os.makedirs('data/truthful', exist_ok=True)
 
 # Instructions for different phases
 INSTRUCTIONS = {
-    "start": "Thank you for taking time answering the following questions. We ask that you answer these next 10 "
-             "questions truthfully.",
-    "switch": "For the next 10 questions we ask that you answer the questions deceitfully (Lie).",
-    "end": "You have completed all questions. Thank you for your participation!"
+    "start": "Thank you for taking the time to answer the following Yes/No questions.\n\n" +
+             "During the next 20 questions, we will collect your mouse movements.\n" +
+             "As such we ask that you answer these next 10 questions truthfully.\n\n" +
+             "NB: The answer choices swap inbetween questions, " +
+             "we ask that you take the time to select the right answer.",
+
+    "switch": "For the next 10 questions we ask that you answer the questions deceitfully (Lie).\n\n" +
+              "NB: The answer choices swap inbetween questions, " +
+              "we ask that you take the time to select the right answer.",
+
+    "end": "You have completed all questions.\n We Thank you for your participation!\n\n" +
+           "Please be so kind to sign the \"Data Collection Consent\" form\n" +
+           "if you do not object to our use of the mouse tracking data collected from you."
 }
 
 # Questions (unchanged)
 QUESTIONS = [
     # Truthful Yes Answers: Ground truth should be YES
     "Are you currently located in Norway?",
-    "Are you currently located in the county: Innlandet?",
-    "Are you currently located in Gjovik?",
+    "Are you currently located in the county (NO: Fylke): Innlandet?",
+    "Are you currently located in Gjøvik?",
     "Are you currently located at NTNU?",
     "Are you currently a Student at NTNU?",
     # Truthful No Answers: Ground truth should be NO
     "Are you currently located in the USA?",
-    "Are you currently located in the state: California?",
+    "Are you currently located in the US state of California?",
     "Are you currently located in Berkeley?",
-    "Are you currently located at UC, Berkeley?",
-    "Are you currently a student at UC, Berkeley?",
+    "Are you currently located at University of California, Berkeley?",
+    "Are you currently a student at University of California, Berkeley?",
     # Skipped to show instructions for deception
     "",
     # Deceitful Yes Answers: Ground truth should be NO
     "Are you currently located in Australia?",
-    "Are you currently located in the state: Victoria?",
+    "Are you currently located in the AU state of Victoria?",
     "Are you currently located in Melbourne?",
-    "Are you currently located at RMIT?",
-    "Are you currently employed as a Professor at RMIT?",
+    "Are you currently located at the Royal Melbourne Institute of Technology?",
+    "Are you currently employed as a Professor at the Royal Melbourne Institute of Technology?",
     # Deceitful No Answers: Ground truth should be YES
     "Are you currently located in Norway?",
-    "Are you currently located in the county: Innlandet?",
-    "Are you currently located in Gjovik?",
+    "Are you currently located in the county (NO: Fylke): Innlandet?",
+    "Are you currently located in Gjøvik?",
     "Are you currently located at NTNU?",
     "Are you currently a Student at NTNU?",
 ]

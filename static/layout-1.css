@@ -60,6 +60,7 @@ body {
     color: var(--text-color);
     line-height: 1.4;
     max-width: 100%;
+    text-align: left;
 }
 
 #map-container {

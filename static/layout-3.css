@@ -82,8 +82,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    font-size: 1.75rem;
+    text-align: left;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
     padding: 0 2rem;

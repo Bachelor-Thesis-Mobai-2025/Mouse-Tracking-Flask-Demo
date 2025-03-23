@@ -42,7 +42,7 @@ let lastDy = 0;
 const locationEmbeds = {
     // Norway locations
     "Norway": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7115129.1005240865!2d7.202227919814455!3d64.19044446471571!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x461268458f4de5bf%3A0xa1b03b9db864d02b!2sNorge!5e0!3m2!1sno!2sno!4v1742225138899!5m2!1sno!2sno",
-    "Gjovik": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31680.92327955288!2d10.676129899999999!3d60.798508!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4641da7f7d25d825%3A0xc834e9351bd371f1!2sGj%C3%B8vik!5e0!3m2!1sno!2sno!4v1711064304382!5m2!1sno!2sno",
+    "Gj\u00F8vik": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31680.92327955288!2d10.676129899999999!3d60.798508!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4641da7f7d25d825%3A0xc834e9351bd371f1!2sGj%C3%B8vik!5e0!3m2!1sno!2sno!4v1711064304382!5m2!1sno!2sno",
     "Innlandet": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1999520.267789213!2d10.49408859677242!3d61.26669287075171!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4613202593a930b7%3A0x4613202593a931b5!2sInnlandet!5e0!3m2!1sno!2sno!4v1711064362211!5m2!1sno!2sno",
     "NTNU": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1947.0953831666425!2d10.679612413300815!3d60.78973439317518!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4641da14f48bc6d1%3A0x15d7b34504988672!2zTlROVSBww6UgR2rDuHZpaw!5e0!3m2!1sno!2sno!4v1742225884390!5m2!1sno!2sno",
 
@@ -50,13 +50,13 @@ const locationEmbeds = {
     "USA": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d24314527.50780894!2d-102.58805748934844!3d40.13885294325144!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x54eab584e432360b%3A0x1c3bb99243deb742!2sUSA!5e0!3m2!1sno!2sno!4v1742225936787!5m2!1sno!2sno",
     "Berkeley": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d50660.14164260444!2d-122.30440033250237!3d37.87223135536998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x80857c3254417ca3%3A0x1f0ce75c7cfefe47!2sBerkeley%2C%20CA%2C%20USA!5e0!3m2!1sno!2sno!4v1711064428032!5m2!1sno!2sno",
     "California": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d12443468.11099838!2d-122.97043661879774!3d36.778261015535724!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x80859a6d00690021%3A0x4a501367f076adff!2sCalifornien%2C%20USA!5e0!3m2!1sno!2sno!4v1711064461141!5m2!1sno!2sno",
-    "UC Berkeley": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3149.532814939858!2d-122.25804328751286!3d37.87121830648002!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808f7718c522d7c1%3A0xda8034ea3b6b3289!2sUniversity%20of%20California!5e0!3m2!1sno!2sno!4v1742226174344!5m2!1sno!2sno",
+    "University of California, Berkeley": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3149.532814939858!2d-122.25804328751286!3d37.87121830648002!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808f7718c522d7c1%3A0xda8034ea3b6b3289!2sUniversity%20of%20California!5e0!3m2!1sno!2sno!4v1742226174344!5m2!1sno!2sno",
 
     // Australian locations
     "Australia": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d34368450.22012237!2d134.48828173214755!3d-25.27433291133309!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2b2bfd076787c5df%3A0x538267a1955b1352!2sAustralia!5e0!3m2!1sno!2sno!4v1711064593220!5m2!1sno!2sno",
     "Melbourne": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d402590.52635753667!2d144.72282398041585!3d-37.971563335846504!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad646b5d2ba4df7%3A0x4045675218ccd90!2sMelbourne%20Victoria%2C%20Australia!5e0!3m2!1sno!2sno!4v1742226652455!5m2!1sno!2sno",
     "Victoria": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3285885.6074694144!2d140.45994787418059!3d-36.46063347963703!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad4314b7e18954f%3A0x5a4efce2be829534!2sVictoria%2C%20Australia!5e0!3m2!1sno!2sno!4v1742226621015!5m2!1sno!2sno",
-    "RMIT": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3152.2194357913054!2d144.96135831278156!3d-37.808328833612855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad642cb0a2ff0fb%3A0xed6e6acedcefb31c!2sRMIT%20University!5e0!3m2!1sno!2sno!4v1742224523627!5m2!1sno!2sno"
+    "Royal Melbourne Institute of Technology": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3152.2194357913054!2d144.96135831278156!3d-37.808328833612855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad642cb0a2ff0fb%3A0xed6e6acedcefb31c!2sRMIT%20University!5e0!3m2!1sno!2sno!4v1742224523627!5m2!1sno!2sno"
 };
 
 // Initialize trajectory data structure
@@ -496,7 +496,7 @@ function fetchQuestion() {
         .then(data => {
             if (data.complete) {
                 // Experiment is complete
-                questionElement.textContent = data.instruction;
+                questionElement.innerText = data.instruction;
                 // Hide the answer buttons and next button
                 yesBtn.style.display = 'none';
                 noBtn.style.display = 'none';
@@ -509,7 +509,7 @@ function fetchQuestion() {
             // Check if this is an instruction screen
             if (data.isInstruction) {
                 // Display instruction
-                questionElement.textContent = data.instruction;
+                questionElement.innerText = data.instruction;
                 // Hide answer buttons for instructions
                 yesBtn.style.display = 'none';
                 noBtn.style.display = 'none';
@@ -524,7 +524,7 @@ function fetchQuestion() {
 
             // Normal question display
             currentQuestion = data.question;
-            questionElement.textContent = data.question;
+            questionElement.innerText = data.question;
 
             // Initialize trajectory data structure
             initTrajectoryData();
