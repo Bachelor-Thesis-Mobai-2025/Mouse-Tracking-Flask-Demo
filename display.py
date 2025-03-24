@@ -71,7 +71,7 @@ def load_and_preprocess_json_file(file_path, normalize_time=True, normalize_xy=T
     dict
         Trajectory metrics
     """
-    # Load JSON data
+    # Load JSON data_new
     with open(file_path, 'r') as f:
         data = json.load(f)
 
@@ -122,7 +122,7 @@ def get_files_by_type(data_directory, truthful=True, max_files=None, file_ext='.
     Parameters:
     -----------
     data_directory : str
-        Path to the data directory
+        Path to the data_new directory
     truthful : bool
         Whether to get truthful or deceptive files
     max_files : int, optional
@@ -217,7 +217,7 @@ def create_average_trajectory(files, normalize=True, resolution=100):
             # Get column names
             x_col, y_col, velocity_col = _get_column_names(df_truncated)
 
-            # Prepare trajectory data
+            # Prepare trajectory data_new
             traj = {
                 'time_normalized': df_truncated['time_normalized'],
                 x_col: df_truncated[x_col],
@@ -357,23 +357,23 @@ def plot_2d_trajectory(ax, data, metrics, is_truthful=True, color_metric='veloci
     -----------
     ax : matplotlib.axes.Axes
         The axes to plot on
-    data : pandas.DataFrame
-        Trajectory data
+    data_new : pandas.DataFrame
+        Trajectory data_new
     metrics : dict
         Trajectory metrics
     is_truthful : bool
-        Whether the data is truthful (True) or deceptive (False)
+        Whether the data_new is truthful (True) or deceptive (False)
     color_metric : str
         Metric to use for coloring the trajectory (e.g., 'velocity', 'curvature')
     """
-    # Set variables based on data type
+    # Set variables based on data_new type
     base_color = 'blue' if is_truthful else 'red'
     label_prefix = 'Truthful' if is_truthful else 'Deceptive'
     title_prefix = 'Truthful' if is_truthful else 'Deceptive'
 
     # Check if selected metric exists
     if color_metric in data.columns:
-        # Make a copy to avoid modifying the original data
+        # Make a copy to avoid modifying the original data_new
         plot_data = data.copy()
 
         # Check for outliers - values that are extremely high compared to most
@@ -491,25 +491,20 @@ def plot_path_efficiency_metrics(ax, truthful_metrics, deceptive_metrics):
         x = x_indices[i]
 
         # Get values
-        t_min = truthful_metrics.get(f"{metric}_min", 0)
         t_avg = truthful_metrics.get(metric, 0)
-        t_max = truthful_metrics.get(f"{metric}_max", 0)
-
-        d_min = deceptive_metrics.get(f"{metric}_min", 0)
         d_avg = deceptive_metrics.get(metric, 0)
-        d_max = deceptive_metrics.get(f"{metric}_max", 0)
 
         # Define bar positions (min → avg → max), alternating truthful/deceptive
-        offsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
-        heights = [t_min, d_min, t_avg, d_avg, t_max, d_max]
-        colors = ['lightblue', 'lightcoral', 'blue', 'red', 'darkblue', 'darkred']
-        labels = ['Truthful Min', 'Deceptive Min', 'Truthful Avg', 'Deceptive Avg', 'Truthful Max', 'Deceptive Max']
+        offsets = [-0.5, 0.5]
+        heights = [t_avg, d_avg]
+        colors = ['blue', 'red']
+        labels = ['Truthful Avg', 'Deceptive Avg']
 
         for j, (offset, height, color, label) in enumerate(zip(offsets, heights, colors, labels)):
             ax.bar(x + offset * bar_width, height, width=bar_width,
                    color=color, label=label if i == 0 else "")
             # Annotate average values only
-            if j in [2, 3]:  # avg bars
+            if j in [0, 1]:  # avg bars
                 ax.text(x + offset * bar_width, height + 0.01, f"{height:.2f}",
                         ha='center', fontsize=7, color='black')
 
@@ -520,25 +515,9 @@ def plot_path_efficiency_metrics(ax, truthful_metrics, deceptive_metrics):
         annotation.append(f"Avg. Hesitation Count: Truthful={truthful_metrics['hesitation_count']:.2f}, "
                           f"Deceptive={deceptive_metrics['hesitation_count']:.2f}")
 
-    if 'hesitation_count_min' in truthful_metrics and 'hesitation_count_min' in deceptive_metrics:
-        annotation.append(f"Min. Hesitation Count: Truthful={truthful_metrics['hesitation_count_min']:.2f}, "
-                          f"Deceptive={deceptive_metrics['hesitation_count_min']:.2f}")
-
-    if 'hesitation_count_max' in truthful_metrics and 'hesitation_count_max' in deceptive_metrics:
-        annotation.append(f"Max. Hesitation Count: Truthful={truthful_metrics['hesitation_count_max']:.2f}, "
-                          f"Deceptive={deceptive_metrics['hesitation_count_max']:.2f}")
-
     if 'direction_changes' in truthful_metrics and 'direction_changes' in deceptive_metrics:
         annotation.append(f"Avg. Direction Changes: Truthful={truthful_metrics['direction_changes']:.2f}, "
                           f"Deceptive={deceptive_metrics['direction_changes']:.2f}")
-
-    if 'direction_changes_min' in truthful_metrics and 'direction_changes_min' in deceptive_metrics:
-        annotation.append(f"Min. Direction Changes: Truthful={truthful_metrics['direction_changes_min']:.2f}, "
-                          f"Deceptive={deceptive_metrics['direction_changes_min']:.2f}")
-
-    if 'direction_changes_max' in truthful_metrics and 'direction_changes_max' in deceptive_metrics:
-        annotation.append(f"Max. Direction Changes: Truthful={truthful_metrics['direction_changes_max']:.2f}, "
-                          f"Deceptive={deceptive_metrics['direction_changes_max']:.2f}")
 
     if annotation:
         ax.text(0.5, 0.75, '\n'.join(annotation), ha='center', va='bottom', transform=ax.transAxes,
@@ -550,7 +529,7 @@ def plot_path_efficiency_metrics(ax, truthful_metrics, deceptive_metrics):
     ax.set_xticks(x_indices)
     ax.set_xticklabels([metric.replace('_', ' ').title() for metric in metrics_to_plot],
                        rotation=45, ha='right')
-    ax.legend(ncol=3, fontsize=8)
+    ax.legend(ncol=1, fontsize=8)
 
     return ax
 
@@ -572,15 +551,15 @@ def plot_pause_analysis(ax, truthful_pauses, deceptive_pauses):
     deceptive_pauses : list
         List of deceptive pause information dictionaries
     """
-    # Extract truthful pause data
+    # Extract truthful pause data_new
     truthful_times = [p['start_time'] for p in truthful_pauses]
     truthful_durations = [p['duration'] for p in truthful_pauses]
 
-    # Extract deceptive pause data
+    # Extract deceptive pause data_new
     deceptive_times = [p['start_time'] for p in deceptive_pauses]
     deceptive_durations = [p['duration'] for p in deceptive_pauses]
 
-    # Plot pause data
+    # Plot pause data_new
     ax.scatter(truthful_times, truthful_durations, color='blue', alpha=0.7, label='Truthful')
     ax.scatter(deceptive_times, deceptive_durations, color='red', alpha=0.7, label='Deceptive')
 
@@ -620,7 +599,7 @@ def plot_pause_analysis(ax, truthful_pauses, deceptive_pauses):
 
 def plot_pause_regression(ax, truthful_pauses, deceptive_pauses):
     """
-    Plot polynomial regression for pause data.
+    Plot polynomial regression for pause data_new.
 
     Parameters:
     -----------
@@ -631,15 +610,15 @@ def plot_pause_regression(ax, truthful_pauses, deceptive_pauses):
     deceptive_pauses : list
         List of deceptive pause information dictionaries
     """
-    # Extract truthful pause data
+    # Extract truthful pause data_new
     truthful_times = np.array([p['start_time'] for p in truthful_pauses]).reshape(-1, 1)
     truthful_durations = np.array([p['duration'] for p in truthful_pauses])
 
-    # Extract deceptive pause data
+    # Extract deceptive pause data_new
     deceptive_times = np.array([p['start_time'] for p in deceptive_pauses]).reshape(-1, 1)
     deceptive_durations = np.array([p['duration'] for p in deceptive_pauses])
 
-    # Perform polynomial regression if we have enough data points
+    # Perform polynomial regression if we have enough data_new points
     if len(truthful_times) > 3:
         truthful_model = make_pipeline(PolynomialFeatures(3), LinearRegression(), memory=None)
         truthful_model.fit(truthful_times, truthful_durations)
@@ -679,9 +658,9 @@ def plot_acceleration_ranges(ax, truthful_data, deceptive_data):
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
     time = truthful_data['time_normalized']
 
@@ -713,11 +692,11 @@ def plot_acceleration_distribution(ax, truthful_data, deceptive_data):
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
-    # Get acceleration data
+    # Get acceleration data_new
     truthful_accel = winsorize_series(truthful_data['acceleration'])
     deceptive_accel = winsorize_series(deceptive_data['acceleration'])
 
@@ -771,18 +750,18 @@ def plot_3d_average_trajectory(ax, data, metrics, is_truthful=True, color_metric
     -----------
     ax : matplotlib.axes.Axes
         The axes to plot on (must be 3D)
-    data : pandas.DataFrame
-        Trajectory data
+    data_new : pandas.DataFrame
+        Trajectory data_new
     metrics : dict
         Trajectory metrics
     is_truthful : bool
-        Whether the data is truthful (True) or deceptive (False)
+        Whether the data_new is truthful (True) or deceptive (False)
     color_metric : str
         Metric to use for coloring the trajectory
     z_metric : str, optional
         If provided, use this metric for the z-axis instead of y_normalized
     """
-    # Set color based on data type
+    # Set color based on data_new type
     base_color = 'blue' if is_truthful else 'red'
     title_prefix = 'Truthful' if is_truthful else 'Deceptive'
 
@@ -797,7 +776,7 @@ def plot_3d_average_trajectory(ax, data, metrics, is_truthful=True, color_metric
 
     # Create a colormap based on the selected metric
     if color_metric in data.columns:
-        # Make a copy to avoid modifying the original data
+        # Make a copy to avoid modifying the original data_new
         plot_data = data.copy()
 
         # Check for outliers - values that are extremely high compared to most
@@ -915,9 +894,9 @@ def plot_velocity_ranges(ax, truthful_data, deceptive_data):
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
     time = truthful_data['time_normalized']
 
@@ -949,9 +928,9 @@ def plot_velocity_averages(ax, truthful_data, deceptive_data):
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
     time = truthful_data['time_normalized']
 
@@ -993,11 +972,11 @@ def plot_velocity_distribution(ax, truthful_data, deceptive_data):
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
-    # Get velocity data
+    # Get velocity data_new
     truthful_vel = winsorize_series(truthful_data['velocity'])
     deceptive_vel = winsorize_series(deceptive_data['velocity'])
 
@@ -1048,16 +1027,16 @@ def plot_velocity_distribution(ax, truthful_data, deceptive_data):
 
 def plot_acceleration_comparison(ax, truthful_data, deceptive_data):
     """
-    Plot acceleration comparison between truthful and deceptive data.
+    Plot acceleration comparison between truthful and deceptive data_new.
 
     Parameters:
     -----------
     ax : matplotlib.axes.Axes
         The axes to plot on
     truthful_data : pandas.DataFrame
-        Truthful trajectory data
+        Truthful trajectory data_new
     deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
+        Deceptive trajectory data_new
     """
     time = truthful_data['time_normalized']
 
@@ -1096,12 +1075,12 @@ def plot_acceleration_comparison(ax, truthful_data, deceptive_data):
 
 def create_trajectory_plots(data_directory, save_directory=None, file_ext='.json'):
     """
-    Create comprehensive visualizations of mouse tracking data and save individual plots.
+    Create comprehensive visualizations of mouse tracking data_new and save individual plots.
 
     Parameters:
     -----------
     data_directory : str
-        Path to the data directory
+        Path to the data_new directory
     save_directory : str, optional
         Directory to save individual plots. If None, plots are not saved.
     file_ext : str
@@ -1118,7 +1097,7 @@ def create_trajectory_plots(data_directory, save_directory=None, file_ext='.json
     print(f"Found {len(truthful_files)} truthful files and {len(deceptive_files)} deceptive files")
 
     if not truthful_files or not deceptive_files:
-        print("Not enough data to create visualizations")
+        print("Not enough data_new to create visualizations")
         return None
 
     # Create average trajectories
@@ -1193,11 +1172,11 @@ def main():
     Main function to run the visualization.
     """
     try:
-        # Default data directory
-        data_directory = "data"
+        # Default data_new directory
+        data_directory = "data_reconstructed"
 
         # Create output directory for individual plots
-        graphs_directory = "graphs"
+        graphs_directory = "graphs_reconstructed"
 
         # File extension to look for
         file_ext = '.json'

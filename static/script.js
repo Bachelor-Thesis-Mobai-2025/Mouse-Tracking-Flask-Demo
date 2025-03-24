@@ -59,7 +59,7 @@ const locationEmbeds = {
     "Victoria": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3285885.6074694144!2d140.45994787418059!3d-36.46063347963703!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad4314b7e18954f%3A0x5a4efce2be829534!2sVictoria%2C%20Australia!5e0!3m2!1sno!2sno!4v1742226621015!5m2!1sno!2sno",
     };
 
-// Initialize trajectory data structure
+// Initialize trajectory data_new structure
 function initTrajectoryData() {
     const currentTime = Date.now();
     trajectoryData = {
@@ -404,7 +404,7 @@ function calculateTrajectoryMetrics() {
             (firstMovementTime - questionStartTime) / 1000;
     }
 
-    // Combined button hover data
+    // Combined button hover data_new
     trajectoryData.trajectory_metrics.hover_time =
         (buttonHoverData.yes.totalTime + buttonHoverData.no.totalTime) / 1000;
     trajectoryData.trajectory_metrics.hover_count =
@@ -425,18 +425,18 @@ function calculateTrajectoryMetrics() {
     trajectoryData.trajectory_metrics.answer_changes = answerChanges;
 }
 
-// Save data
+// Save data_new
 function saveData() {
     // Don't save if no answer selected
     if (selectedAnswer === null) {
-        console.warn("No answer selected, not saving data");
+        console.warn("No answer selected, not saving data_new");
         return;
     }
 
     // Calculate final metrics
     calculateTrajectoryMetrics();
 
-    // Add answer to data
+    // Add answer to data_new
     trajectoryData.answer = selectedAnswer; // 1 for yes, 0 for no
 
     fetch('/log_data', {
@@ -447,11 +447,11 @@ function saveData() {
         .then(response => response.json())
         .then(data => {
             if (data.status !== "success") {
-                console.error("Failed to save data:", data.message);
+                console.error("Failed to save data_new:", data.message);
             }
         })
         .catch(error => {
-            console.error("Error saving data:", error);
+            console.error("Error saving data_new:", error);
         });
 
     // Reset selected answer
@@ -526,7 +526,7 @@ function fetchQuestion() {
             currentQuestion = data.question;
             questionElement.innerText = data.question;
 
-            // Initialize trajectory data structure
+            // Initialize trajectory data_new structure
             initTrajectoryData();
 
             // Swap button positions randomly

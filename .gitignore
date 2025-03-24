@@ -4,5 +4,4 @@
 *.json
 .env
 *.pdf
-data_backup
-graphs_backup
+data_csv

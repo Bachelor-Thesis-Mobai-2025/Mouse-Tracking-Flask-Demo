@@ -12,8 +12,8 @@ CORS(app)
 app.secret_key = os.urandom(32)
 
 # Make sure these directories exist
-os.makedirs('data/deceptive', exist_ok=True)
-os.makedirs('data/truthful', exist_ok=True)
+os.makedirs('data_new/deceptive', exist_ok=True)
+os.makedirs('data_new/truthful', exist_ok=True)
 
 # Instructions for different phases
 INSTRUCTIONS = {
@@ -29,7 +29,7 @@ INSTRUCTIONS = {
 
     "end": "You have completed all questions.\n We Thank you for your participation!\n\n" +
            "Please be so kind to sign the \"Data Collection Consent\" form\n" +
-           "if you do not object to our use of the mouse tracking data collected from you."
+           "if you do not object to our use of the mouse tracking data_new collected from you."
 }
 
 # Questions (unchanged)
@@ -77,7 +77,7 @@ GROUND_TRUTH = [
 
 @app.route('/')
 def index():
-    # Reset session data when starting a new session
+    # Reset session data_new when starting a new session
     session['question_count'] = 0
     session['asked_truthful_indices'] = []
     session['asked_deceptive_indices'] = []
@@ -87,7 +87,7 @@ def index():
 
 @app.route('/log_data', methods=['POST'])
 def log_data():
-    # Get the JSON data from the request
+    # Get the JSON data_new from the request
     trajectory_data = request.json
 
     # Get the last asked question index from session
@@ -114,7 +114,7 @@ def log_data():
     # Select folder based on truthfulness
     subfolder = 'truthful' if is_truthful else 'deceptive'
 
-    # Add truthfulness label to the data
+    # Add truthfulness label to the data_new
     trajectory_data['label'] = 'truthful' if is_truthful else 'deceptive'
 
     # Remove any potentially biasing information
@@ -127,7 +127,7 @@ def log_data():
 
     # Create filename with timestamp and answer suffix
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f'data/{subfolder}/tracking_{timestamp}_{answer_suffix}.json'
+    filename = f'data_new/{subfolder}/tracking_{timestamp}_{answer_suffix}.json'
 
     # Save to JSON file
     with open(filename, 'w') as jsonfile:
