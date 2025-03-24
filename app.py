@@ -38,7 +38,7 @@ QUESTIONS = [
     "Are you currently located in Norway?",
     "Are you currently located in the county (NO: Fylke): Innlandet?",
     "Are you currently located in Gjøvik?",
-    "Are you currently located at NTNU?",
+    "Are you currently located at NTNU Gjøvik?",
     "Are you currently a Student at NTNU?",
     # Truthful No Answers: Ground truth should be NO
     "Are you currently located in the USA?",
@@ -58,7 +58,7 @@ QUESTIONS = [
     "Are you currently located in Norway?",
     "Are you currently located in the county (NO: Fylke): Innlandet?",
     "Are you currently located in Gjøvik?",
-    "Are you currently located at NTNU?",
+    "Are you currently located at NTNU Gjøvik?",
     "Are you currently a Student at NTNU?",
 ]
 

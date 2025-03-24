@@ -1,6 +1,7 @@
 .venv
 .idea
 *.csv
+*.json
 .env
 *.pdf
 data_backup

@@ -17,6 +17,12 @@ from sklearn.pipeline import make_pipeline
 matplotlib.use('TkAgg')
 
 
+def winsorize_series(series, lower_percentile=1, upper_percentile=99):
+    lower = np.percentile(series, lower_percentile)
+    upper = np.percentile(series, upper_percentile)
+    return np.clip(series, lower, upper)
+
+
 # ========================
 # DATA LOADING FUNCTIONS
 # ========================
@@ -260,10 +266,13 @@ def create_average_trajectory(files, normalize=True, resolution=100):
     min_jerks = np.min(jerks, axis=0)
     max_jerks = np.max(jerks, axis=0)
 
-    # Compute average metrics from all_metrics
+    # Compute average, min, max metrics from all_metrics
     avg_metrics = {}
     for key in all_metrics[0].keys():
-        avg_metrics[key] = np.mean([m.get(key, 0) for m in all_metrics])
+        values = [m.get(key, 0) for m in all_metrics]
+        avg_metrics[key] = np.mean(values)
+        avg_metrics[f"{key}_min"] = np.min(values)
+        avg_metrics[f"{key}_max"] = np.max(values)
 
     # Create a DataFrame for the average trajectory with additional columns for min/max
     return pd.DataFrame({
@@ -455,19 +464,11 @@ def plot_2d_trajectory(ax, data, metrics, is_truthful=True, color_metric='veloci
 
 def plot_path_efficiency_metrics(ax, truthful_metrics, deceptive_metrics):
     """
-    Create a bar chart comparing path efficiency metrics between truthful and deceptive trajectories.
-
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        The axes to plot on
-    truthful_metrics : dict
-        Dictionary of truthful trajectory metrics
-    deceptive_metrics : dict
-        Dictionary of deceptive trajectory metrics
+    Grouped bar chart showing min, avg, max for each metric with
+    side-by-side truthful and deceptive bars.
     """
-    # Define metrics to plot
-    metrics_to_plot = [
+
+    base_metrics = [
         'decision_path_efficiency',
         'final_decision_path_efficiency',
         'hesitation_time',
@@ -475,59 +476,81 @@ def plot_path_efficiency_metrics(ax, truthful_metrics, deceptive_metrics):
         'total_pause_time'
     ]
 
-    # Filter to metrics that actually exist in the data
-    metrics_to_plot = [m for m in metrics_to_plot if m in truthful_metrics and m in deceptive_metrics]
-
-    # If no metrics to plot, show message
+    metrics_to_plot = [m for m in base_metrics if m in truthful_metrics and m in deceptive_metrics]
     if not metrics_to_plot:
         ax.text(0.5, 0.5, "No path efficiency metrics available",
                 ha='center', va='center', transform=ax.transAxes)
         ax.set_title("Path Efficiency Metrics Comparison")
         return ax
 
-    # Set up bar positions
-    bar_width = 0.35
-    x_indices = np.arange(len(metrics_to_plot))
+    bar_width = 0.1
+    group_width = 6 * bar_width
+    x_indices = np.arange(len(metrics_to_plot)) * (group_width + 0.1)
 
-    # Create bars for truthful metrics
-    truthful_values = [truthful_metrics.get(metric, 0) for metric in metrics_to_plot]
-    deceptive_values = [deceptive_metrics.get(metric, 0) for metric in metrics_to_plot]
+    for i, metric in enumerate(metrics_to_plot):
+        x = x_indices[i]
 
-    # Plot bars
-    ax.bar(x_indices - bar_width/2, truthful_values, width=bar_width,
-           color='blue', alpha=0.7, label='Truthful')
-    ax.bar(x_indices + bar_width/2, deceptive_values, width=bar_width,
-           color='red', alpha=0.7, label='Deceptive')
+        # Get values
+        t_min = truthful_metrics.get(f"{metric}_min", 0)
+        t_avg = truthful_metrics.get(metric, 0)
+        t_max = truthful_metrics.get(f"{metric}_max", 0)
 
-    # Add text labels
-    for i, (t_val, d_val) in enumerate(zip(truthful_values, deceptive_values)):
-        ax.text(x_indices[i] - bar_width/2, t_val + 0.02, f"{t_val:.2f}",
-                ha='center', va='bottom', fontsize=8)
-        ax.text(x_indices[i] + bar_width/2, d_val + 0.02, f"{d_val:.2f}",
-                ha='center', va='bottom', fontsize=8)
+        d_min = deceptive_metrics.get(f"{metric}_min", 0)
+        d_avg = deceptive_metrics.get(metric, 0)
+        d_max = deceptive_metrics.get(f"{metric}_max", 0)
+
+        # Define bar positions (min → avg → max), alternating truthful/deceptive
+        offsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
+        heights = [t_min, d_min, t_avg, d_avg, t_max, d_max]
+        colors = ['lightblue', 'lightcoral', 'blue', 'red', 'darkblue', 'darkred']
+        labels = ['Truthful Min', 'Deceptive Min', 'Truthful Avg', 'Deceptive Avg', 'Truthful Max', 'Deceptive Max']
+
+        for j, (offset, height, color, label) in enumerate(zip(offsets, heights, colors, labels)):
+            ax.bar(x + offset * bar_width, height, width=bar_width,
+                   color=color, label=label if i == 0 else "")
+            # Annotate average values only
+            if j in [2, 3]:  # avg bars
+                ax.text(x + offset * bar_width, height + 0.01, f"{height:.2f}",
+                        ha='center', fontsize=7, color='black')
 
     # Add additional metrics as annotations if available
     annotation = []
 
     if 'hesitation_count' in truthful_metrics and 'hesitation_count' in deceptive_metrics:
-        annotation.append(f"Hesitation Count: Truthful={truthful_metrics['hesitation_count']:.2f}, "
+        annotation.append(f"Avg. Hesitation Count: Truthful={truthful_metrics['hesitation_count']:.2f}, "
                           f"Deceptive={deceptive_metrics['hesitation_count']:.2f}")
 
+    if 'hesitation_count_min' in truthful_metrics and 'hesitation_count_min' in deceptive_metrics:
+        annotation.append(f"Min. Hesitation Count: Truthful={truthful_metrics['hesitation_count_min']:.2f}, "
+                          f"Deceptive={deceptive_metrics['hesitation_count_min']:.2f}")
+
+    if 'hesitation_count_max' in truthful_metrics and 'hesitation_count_max' in deceptive_metrics:
+        annotation.append(f"Max. Hesitation Count: Truthful={truthful_metrics['hesitation_count_max']:.2f}, "
+                          f"Deceptive={deceptive_metrics['hesitation_count_max']:.2f}")
+
     if 'direction_changes' in truthful_metrics and 'direction_changes' in deceptive_metrics:
-        annotation.append(f"Direction Changes: Truthful={truthful_metrics['direction_changes']:.2f}, "
+        annotation.append(f"Avg. Direction Changes: Truthful={truthful_metrics['direction_changes']:.2f}, "
                           f"Deceptive={deceptive_metrics['direction_changes']:.2f}")
 
+    if 'direction_changes_min' in truthful_metrics and 'direction_changes_min' in deceptive_metrics:
+        annotation.append(f"Min. Direction Changes: Truthful={truthful_metrics['direction_changes_min']:.2f}, "
+                          f"Deceptive={deceptive_metrics['direction_changes_min']:.2f}")
+
+    if 'direction_changes_max' in truthful_metrics and 'direction_changes_max' in deceptive_metrics:
+        annotation.append(f"Max. Direction Changes: Truthful={truthful_metrics['direction_changes_max']:.2f}, "
+                          f"Deceptive={deceptive_metrics['direction_changes_max']:.2f}")
+
     if annotation:
-        ax.text(0.5, 0.01, '\n'.join(annotation), ha='center', va='bottom', transform=ax.transAxes,
+        ax.text(0.5, 0.75, '\n'.join(annotation), ha='center', va='bottom', transform=ax.transAxes,
                 fontsize=9, bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
 
     # Customize plot
     ax.set_ylabel('Metric Value')
-    ax.set_title("Path Efficiency Metrics Comparison")
+    ax.set_title("Path Efficiency Metrics Comparison (Min / Avg / Max)")
     ax.set_xticks(x_indices)
     ax.set_xticklabels([metric.replace('_', ' ').title() for metric in metrics_to_plot],
                        rotation=45, ha='right')
-    ax.legend()
+    ax.legend(ncol=3, fontsize=8)
 
     return ax
 
@@ -616,10 +639,6 @@ def plot_pause_regression(ax, truthful_pauses, deceptive_pauses):
     deceptive_times = np.array([p['start_time'] for p in deceptive_pauses]).reshape(-1, 1)
     deceptive_durations = np.array([p['duration'] for p in deceptive_pauses])
 
-    # Plot raw data points
-    ax.scatter(truthful_times, truthful_durations, color='blue', alpha=0.7, label='Truthful Data')
-    ax.scatter(deceptive_times, deceptive_durations, color='red', alpha=0.7, label='Deceptive Data')
-
     # Perform polynomial regression if we have enough data points
     if len(truthful_times) > 3:
         truthful_model = make_pipeline(PolynomialFeatures(3), LinearRegression(), memory=None)
@@ -642,20 +661,6 @@ def plot_pause_regression(ax, truthful_pauses, deceptive_pauses):
 
         # Plot regression line
         ax.plot(x_range, deceptive_pred, 'r-', linewidth=2, label='Deceptive Trend')
-
-    # Calculate and display statistics
-    truthful_avg = np.mean(truthful_durations) if len(truthful_durations) > 0 else 0
-    deceptive_avg = np.mean(deceptive_durations) if len(deceptive_durations) > 0 else 0
-
-    # Add text annotations for statistics
-    stats_text = (
-        f"Truthful: {len(truthful_pauses)} pauses, Avg Duration: {truthful_avg:.3f}\n"
-        f"Deceptive: {len(deceptive_pauses)} pauses, Avg Duration: {deceptive_avg:.3f}"
-    )
-
-    ax.text(0.5, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
-            horizontalalignment='center', verticalalignment='top',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
     ax.set_xlabel('Normalized Time')
     ax.set_ylabel('Pause Duration')
@@ -699,50 +704,6 @@ def plot_acceleration_ranges(ax, truthful_data, deceptive_data):
     return ax
 
 
-def plot_acceleration_averages(ax, truthful_data, deceptive_data):
-    """
-    Plot only the average accelerations without ranges.
-
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        The axes to plot on
-    truthful_data : pandas.DataFrame
-        Truthful trajectory data
-    deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
-    """
-    time = truthful_data['time_normalized']
-
-    # Plot only average accelerations
-    ax.plot(time, truthful_data['acceleration'], 'b-', label='Truthful Avg', linewidth=2)
-    ax.plot(time, deceptive_data['acceleration'], 'r-', label='Deceptive Avg', linewidth=2)
-
-    # Calculate difference between accelerations
-    accel_diff = np.abs(truthful_data['acceleration'] - deceptive_data['acceleration'])
-
-    # Find and highlight significant difference points
-    threshold = accel_diff.mean() + accel_diff.std()
-    significant_points = time[accel_diff > threshold]
-
-    # Highlight regions of significant difference
-    for point in significant_points:
-        ax.axvline(x=point, color='grey', linestyle='--', alpha=0.2)
-
-    # Add annotation for significant differences
-    if len(significant_points) > 0:
-        ax.text(0.05, 0.95, f'Significant differences: {len(significant_points)} points',
-                transform=ax.transAxes, fontsize=10,
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='grey'))
-
-    ax.set_xlabel('Normalized Time')
-    ax.set_ylabel('Acceleration')
-    ax.set_title('Average Accelerations: Truthful vs Deceptive')
-    ax.legend()
-
-    return ax
-
-
 def plot_acceleration_distribution(ax, truthful_data, deceptive_data):
     """
     Plot acceleration distribution comparison.
@@ -757,8 +718,8 @@ def plot_acceleration_distribution(ax, truthful_data, deceptive_data):
         Deceptive trajectory data
     """
     # Get acceleration data
-    truthful_accel = truthful_data['acceleration']
-    deceptive_accel = deceptive_data['acceleration']
+    truthful_accel = winsorize_series(truthful_data['acceleration'])
+    deceptive_accel = winsorize_series(deceptive_data['acceleration'])
 
     # Create density plots
     try:
@@ -995,11 +956,11 @@ def plot_velocity_averages(ax, truthful_data, deceptive_data):
     time = truthful_data['time_normalized']
 
     # Plot only average velocities
-    ax.plot(time, truthful_data['velocity'], 'b-', label='Truthful Avg', linewidth=2)
-    ax.plot(time, deceptive_data['velocity'], 'r-', label='Deceptive Avg', linewidth=2)
+    ax.plot(time, winsorize_series(truthful_data['velocity']), 'b-', label='Truthful Avg', linewidth=2)
+    ax.plot(time, winsorize_series(deceptive_data['velocity']), 'r-', label='Deceptive Avg', linewidth=2)
 
     # Calculate difference between velocities
-    velocity_diff = np.abs(truthful_data['velocity'] - deceptive_data['velocity'])
+    velocity_diff = np.abs(winsorize_series(truthful_data['velocity']) - winsorize_series(deceptive_data['velocity']))
 
     # Find and highlight significant difference points
     threshold = velocity_diff.mean() + velocity_diff.std()
@@ -1023,55 +984,6 @@ def plot_velocity_averages(ax, truthful_data, deceptive_data):
     return ax
 
 
-def plot_normalized_velocity_comparison(ax, truthful_data, deceptive_data):
-    """
-    Plot normalized velocity comparison for clearer visualization.
-
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        The axes to plot on
-    truthful_data : pandas.DataFrame
-        Truthful trajectory data
-    deceptive_data : pandas.DataFrame
-        Deceptive trajectory data
-    """
-    time = truthful_data['time_normalized']
-
-    # Normalize velocities to 0-1 range for each dataset
-    def normalize_series(series):
-        min_val = series.min()
-        max_val = series.max()
-        return (series - min_val) / (max_val - min_val) if max_val > min_val else series
-
-    truthful_velocity_norm = normalize_series(truthful_data['velocity'])
-    deceptive_velocity_norm = normalize_series(deceptive_data['velocity'])
-
-    # Plot normalized velocities
-    ax.plot(time, truthful_velocity_norm, 'b-', label='Truthful', linewidth=2)
-    ax.plot(time, deceptive_velocity_norm, 'r-', label='Deceptive', linewidth=2)
-
-    # Add vertical lines at significant difference points
-    diff = np.abs(truthful_velocity_norm - deceptive_velocity_norm)
-    significant_points = time[diff > diff.mean() + diff.std()]
-
-    for point in significant_points:
-        ax.axvline(x=point, color='grey', linestyle='--', alpha=0.3)
-
-    # Add annotation for significant differences
-    if len(significant_points) > 0:
-        ax.text(0.05, 0.95, f'Significant differences: {len(significant_points)} points',
-                transform=ax.transAxes, fontsize=10,
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='grey'))
-
-    ax.set_xlabel('Normalized Time')
-    ax.set_ylabel('Normalized Velocity')
-    ax.set_title('Normalized Velocity Comparison: Truthful vs Deceptive')
-    ax.legend()
-
-    return ax
-
-
 def plot_velocity_distribution(ax, truthful_data, deceptive_data):
     """
     Plot velocity distribution comparison.
@@ -1086,8 +998,8 @@ def plot_velocity_distribution(ax, truthful_data, deceptive_data):
         Deceptive trajectory data
     """
     # Get velocity data
-    truthful_vel = truthful_data['velocity']
-    deceptive_vel = deceptive_data['velocity']
+    truthful_vel = winsorize_series(truthful_data['velocity'])
+    deceptive_vel = winsorize_series(deceptive_data['velocity'])
 
     # Create density plots
     try:
@@ -1150,11 +1062,12 @@ def plot_acceleration_comparison(ax, truthful_data, deceptive_data):
     time = truthful_data['time_normalized']
 
     # Plot average accelerations
-    ax.plot(time, truthful_data['acceleration'], 'b-', label='Truthful', linewidth=2)
-    ax.plot(time, deceptive_data['acceleration'], 'r-', label='Deceptive', linewidth=2)
+    ax.plot(time, winsorize_series(truthful_data['acceleration']), 'b-', label='Truthful', linewidth=2)
+    ax.plot(time, winsorize_series(deceptive_data['acceleration']), 'r-', label='Deceptive', linewidth=2)
 
     # Calculate difference between accelerations
-    accel_diff = np.abs(truthful_data['acceleration'] - deceptive_data['acceleration'])
+    accel_diff = np.abs(winsorize_series(truthful_data['acceleration'])
+                        - winsorize_series(deceptive_data['acceleration']))
 
     # Find and highlight significant difference points
     threshold = accel_diff.mean() + accel_diff.std()
@@ -1235,7 +1148,6 @@ def create_trajectory_plots(data_directory, save_directory=None, file_ext='.json
          "3D_Deceptive_Trajectory"),
 
         # Velocity visualizations
-        (plot_normalized_velocity_comparison, [truthful_avg, deceptive_avg], "Normalized_Velocity_Comparison"),
         (plot_velocity_ranges, [truthful_avg, deceptive_avg], "Velocity_Ranges"),
         (plot_velocity_averages, [truthful_avg, deceptive_avg], "Velocity_Averages"),
         (plot_velocity_distribution, [truthful_avg, deceptive_avg], "Velocity_Distribution"),
@@ -1243,7 +1155,6 @@ def create_trajectory_plots(data_directory, save_directory=None, file_ext='.json
         # Acceleration visualizations
         (plot_acceleration_comparison, [truthful_avg, deceptive_avg], "Acceleration_Comparison"),
         (plot_acceleration_ranges, [truthful_avg, deceptive_avg], "Acceleration_Ranges"),
-        (plot_acceleration_averages, [truthful_avg, deceptive_avg], "Acceleration_Averages"),
         (plot_acceleration_distribution, [truthful_avg, deceptive_avg], "Acceleration_Distribution"),
 
         # Pause analysis
